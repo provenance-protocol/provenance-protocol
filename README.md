@@ -174,6 +174,15 @@ const r = await checkDeclaration(declaration, {
 r.anchor   // 'affiliation' — tied to the organisation, not to a location
 ```
 
+Anyone the company shares the two files with can check them the same way:
+
+```bash
+npx provenance-protocol verify PROVENANCE.json --affiliation affiliation.json
+```
+
+It fetches the company's own declaration from its public domain, checks it is
+genuine, and verifies the affiliation against the key inside it.
+
 ## Your first declaration, in about five minutes
 
 ```bash

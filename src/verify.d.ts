@@ -133,6 +133,12 @@ export interface CheckDeclarationOptions {
   requireCapabilities?: string[];
   /** Key fingerprint seen before; a different one is refused as a rotation. */
   expectedFingerprint?: string;
+  /**
+   * For an internal agent: its operator's affiliation attestation and the
+   * operator's public key (from the operator's own verified declaration).
+   * Stands in for the location check when the location does not match.
+   */
+  affiliation?: { attestation: unknown; issuerPublicKey: string; now?: Date | number };
 }
 
 export interface CheckDeclarationResult {

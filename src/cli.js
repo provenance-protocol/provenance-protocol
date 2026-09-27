@@ -7,7 +7,7 @@
  *   provenance check [file] [--update] [--strict]
  *   provenance keygen
  *   provenance sign [file]
- *   provenance verify <file | url | provenance_id> [--from <url>]
+ *   provenance verify <file | url | provenance_id> [--from <url>] [--affiliation <file | url>]
  *   provenance validate [file]
  *   provenance verify-attestation <file | url> [--issuer-key <base64>]
  *   provenance affiliate <declaration> --org <org_provenance_id> [--unit <name>]
@@ -23,7 +23,7 @@ import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
 import { createRequire } from 'module';
 import YAML from 'yaml';
-import { verifyDeclaration, locateDeclaration, keyFingerprint, verifyAttestation } from './verify.js';
+import { verifyDeclaration, checkDeclaration, locateDeclaration, keyFingerprint, verifyAttestation } from './verify.js';
 import { validateDeclaration } from './validate.js';
 import { signDeclaration, signAttestation } from './keygen.js';
 import { detectProject, runInit } from './init.js';
@@ -355,16 +355,62 @@ async function cmdVerify(args) {
   }
 
   const r = await verifyDeclaration(value, { retrievedFrom });
+
+  // An internal agent's operator vouches for it instead of a public location.
+  let vouched = null;
+  if (typeof args.affiliation === 'string') {
+    let text;
+    try {
+      if (/^https?:\/\//.test(args.affiliation)) {
+        const res = await fetch(args.affiliation, { redirect: 'error' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        text = await res.text();
+      } else text = readFileSync(resolve(process.cwd(), args.affiliation), 'utf8');
+    } catch (e) { console.error(err(`Could not read the affiliation ${args.affiliation}: ${e.message}`)); process.exit(2); }
+    let att;
+    try { att = JSON.parse(text); } catch { console.error(err('The affiliation is not JSON')); process.exit(1); }
+    const org = typeof args['org-key'] === 'string' ? { key: args['org-key'] } : await issuerKey(att?.issuer?.provenance_id);
+    const chk = await checkDeclaration(value, { retrievedFrom, affiliation: { attestation: att, issuerPublicKey: org.key } });
+    // Served from its own location, the affiliation is not needed; otherwise it must hold on its own.
+    if (chk.anchor !== 'location') {
+      vouched = chk.anchor === 'affiliation' ? { org: att.issuer.provenance_id, unit: att.claims?.unit ?? null }
+        : { error: chk.reason ?? 'the affiliation does not cover this declaration' };
+    }
+  }
+
   console.log();
   console.log(`${dim('Provenance id:')}  ${r.provenanceId ?? dim('none')}`);
   console.log(`${dim('Signature:')}      ${r.valid ? c.green + 'valid' : r.signed ? c.red + 'INVALID' : c.amber + 'none'}${c.reset}`);
   console.log(`${dim('Covers:')}         ${r.coverage === 'declaration' ? 'the whole declaration' : r.coverage === 'identity' ? c.amber + 'identity only (0.1) — constraints not protected' + c.reset : dim('—')}`);
   console.log(`${dim('Location:')}       ${r.location === 'match' ? c.green + 'matches its id' : r.location === 'mismatch' ? c.red + 'does NOT match its id' : c.amber + (retrievedFrom ? 'could not be checked' : 'not checked (local file; pass --from <url>)')}${c.reset}`);
   if (r.fingerprint) console.log(`${dim('Key fingerprint:')} ${r.fingerprint}`);
+  if (vouched) console.log(`${dim('Operator:')}       ${vouched.error ? c.red + 'affiliation does NOT check out: ' + vouched.error : c.green + 'vouched for by ' + vouched.org + (vouched.unit ? ` (${vouched.unit})` : '') + c.reset + dim(' — stands in for the location check')}${c.reset}`);
   if (r.reason) console.log(`\n${dim(r.reason)}`);
   console.log();
 
-  if (!r.valid || r.location === 'mismatch') process.exit(1);
+  if (!r.valid) process.exit(1);
+  if (vouched) process.exit(vouched.error ? 1 : 0);
+  if (r.location === 'mismatch') process.exit(1);
+}
+
+/** An organisation's or issuer's key, from its own declaration, verified at its own location. */
+async function issuerKey(issuer) {
+  const url = issuer ? locateDeclaration(issuer) : null;
+  if (!url) { console.error(err(`Cannot locate the declaration for ${issuer ?? '(no issuer)'}`)); process.exit(2); }
+  let decl;
+  try {
+    const res = await fetch(url, { redirect: 'error' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const body = await res.text();
+    decl = /\.json($|\?)/.test(url) ? JSON.parse(body) : parseYaml(body);
+  } catch (e) { console.error(err(`Could not fetch ${issuer}'s declaration at ${url}: ${e.message}`)); process.exit(2); }
+  const v = await verifyDeclaration(decl, { retrievedFrom: url });
+  if (!v.valid || v.location !== 'match' || v.provenanceId !== issuer) {
+    console.error(err(`${issuer}'s own declaration does not check out (${v.reason ?? 'location or id mismatch'}) — its key cannot be trusted.`));
+    process.exit(1);
+  }
+  console.log(ok(`${issuer}: declaration genuine, key ${v.fingerprint.slice(0, 16)}…`));
+  return { key: v.publicKey, fingerprint: v.fingerprint };
 }
 
 // An organisation vouching for one of its own agents: "we operate this
@@ -616,6 +662,8 @@ ${amb('Offline — no service involved:')}
   ${hi('keygen')}                              Generate an Ed25519 keypair
   ${hi('sign')}      [file]                     Sign a 0.2 declaration in place (default: ./PROVENANCE.yml)
   ${hi('verify')}    <file | url | id>          Verify a declaration's signature and location
+                 [--affiliation <file | url>]  …or, for an internal agent, its operator's affiliation
+                 [--org-key <base64>]          the operator's key, instead of fetching its declaration
                [--from <url>]            where a local file was published
   ${hi('validate')}  [file]                     Check a declaration against the schema
   ${hi('verify-attestation')} <file | url>     Check a stamp against its issuer's own published key

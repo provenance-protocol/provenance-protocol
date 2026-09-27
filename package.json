@@ -1,6 +1,6 @@
 {
   "name": "provenance-protocol",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "description": "The Provenance Protocol — an open standard for AI agent identity — with offline verification, signing and attestations",
   "type": "module",
   "main": "./src/index.js",
@@ -69,7 +69,7 @@
     "node": ">=18"
   },
   "scripts": {
-    "test": "node test/verify.test.mjs && node test/declaration-signature.test.mjs && node test/payload-separation.test.mjs && node test/location.test.mjs && node test/attestation.test.mjs && node test/check.test.mjs && node test/validate.test.mjs && node test/canonical.test.mjs && node test/compare.test.mjs && node test/notice.test.mjs && node test/internal.test.mjs && node test/init.test.mjs && node test/check-project.test.mjs && node test/verify-attestation-cli.test.mjs"
+    "test": "node test/verify.test.mjs && node test/declaration-signature.test.mjs && node test/payload-separation.test.mjs && node test/location.test.mjs && node test/attestation.test.mjs && node test/check.test.mjs && node test/validate.test.mjs && node test/canonical.test.mjs && node test/compare.test.mjs && node test/notice.test.mjs && node test/internal.test.mjs && node test/init.test.mjs && node test/check-project.test.mjs && node test/verify-attestation-cli.test.mjs && node test/verify-affiliation-cli.test.mjs"
   },
   "dependencies": {
     "yaml": "^2.9.1"
