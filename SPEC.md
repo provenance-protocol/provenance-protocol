@@ -972,7 +972,7 @@ definition.
 ## Implementing this specification
 
 This specification, its JSON Schema and its test vectors are published under
-the MIT Licence. You may implement them in any language, for any purpose,
+the Apache License, Version 2.0. You may implement them in any language, for any purpose,
 commercial or otherwise, without permission, notification or fee.
 
 Nothing in this specification requires contacting any particular service. A
@@ -1033,5 +1033,5 @@ particular issuer is a decision the standard deliberately leaves to the reader.
 
 ---
 
-*Provenance Protocol — MIT License*
+*Provenance Protocol — Apache License 2.0*
 *https://github.com/provenance-protocol/provenance-protocol*

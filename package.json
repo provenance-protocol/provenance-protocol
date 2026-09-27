@@ -1,6 +1,6 @@
 {
   "name": "provenance-protocol",
-  "version": "0.11.0",
+  "version": "0.11.1",
   "description": "The Provenance Protocol — an open standard for AI agent identity — with offline verification, signing and attestations",
   "type": "module",
   "main": "./src/index.js",
@@ -44,7 +44,8 @@
     "vocabulary.json",
     "README.md",
     "SPEC.md",
-    "LICENSE"
+    "LICENSE",
+    "NOTICE"
   ],
   "keywords": [
     "ai-agent",
@@ -58,7 +59,7 @@
     "standard",
     "attestation"
   ],
-  "license": "MIT",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/provenance-protocol/provenance-protocol"

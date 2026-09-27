@@ -22,7 +22,7 @@ npm install provenance-protocol
 | [**schema/**](./schema/) | JSON Schemas for declarations (0.1, 0.2) and attestations (0.1). |
 | [**test-vectors/**](./test-vectors/) | Normative vectors. Pass these and you interoperate. |
 
-MIT-licensed. Implement it in any language, for any purpose, without permission
+Licensed under Apache 2.0. Implement it in any language, for any purpose, without permission
 or notification. Indexes, monitors and attesters are applications built on the
 standard, not part of it.
 
@@ -290,4 +290,6 @@ The CLI's `register`, `status` and `revoke` commands likewise need
 | [`provenance-action`](https://github.com/provenance-protocol/provenance-action) | Verify a declaration in CI |
 | [`ajp-protocol`](https://github.com/provenance-protocol/ajp-protocol) | Agent Job Protocol — agent-to-agent job delegation |
 
-## MIT License
+## License
+
+Apache License 2.0 — see [LICENSE](./LICENSE). Versions before 0.11.1 were released under MIT.
