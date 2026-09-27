@@ -9,6 +9,7 @@
  *   provenance sign [file]
  *   provenance verify <file | url | provenance_id> [--from <url>]
  *   provenance validate [file]
+ *   provenance verify-attestation <file | url> [--issuer-key <base64>]
  *   provenance affiliate <declaration> --org <org_provenance_id> [--unit <name>]
  *
  * Against an index you name (--index <url> or PROVENANCE_INDEX_URL):
@@ -22,7 +23,7 @@ import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
 import { createRequire } from 'module';
 import YAML from 'yaml';
-import { verifyDeclaration, locateDeclaration, keyFingerprint } from './verify.js';
+import { verifyDeclaration, locateDeclaration, keyFingerprint, verifyAttestation } from './verify.js';
 import { validateDeclaration } from './validate.js';
 import { signDeclaration, signAttestation } from './keygen.js';
 import { detectProject, runInit } from './init.js';
@@ -419,6 +420,60 @@ async function cmdAffiliate(args) {
   }
 }
 
+// Check a stamp without trusting whoever issued it: the issuer's key is taken
+// from the issuer's own declaration, verified at the location its id names —
+// or supplied directly with --issuer-key for a fully offline check.
+async function cmdVerifyAttestation(args) {
+  const target = args._[1];
+  if (!target) { console.error(err('Usage: provenance verify-attestation <file | url> [--issuer-key <base64>]')); process.exit(1); }
+  let text;
+  if (/^https?:\/\//.test(target)) {
+    try {
+      const res = await fetch(target, { redirect: 'error' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      text = await res.text();
+    } catch (e) { console.error(err(`Could not fetch ${target}: ${e.message}`)); process.exit(2); }
+  } else {
+    const path = resolve(process.cwd(), target);
+    if (!existsSync(path)) { console.error(err(`File not found: ${path}`)); process.exit(2); }
+    text = readFileSync(path, 'utf8');
+  }
+  let att;
+  try { att = JSON.parse(text); } catch { console.error(err('Not an attestation: expected JSON')); process.exit(1); }
+
+  let key = typeof args['issuer-key'] === 'string' ? args['issuer-key'] : null;
+  const issuer = att?.issuer?.provenance_id;
+  if (!key) {
+    const url = issuer ? locateDeclaration(issuer) : null;
+    if (!url) { console.error(err(`Cannot locate the issuer's declaration for ${issuer ?? '(no issuer)'}; pass --issuer-key`)); process.exit(2); }
+    let decl;
+    try {
+      const res = await fetch(url, { redirect: 'error' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const body = await res.text();
+      decl = /\.json($|\?)/.test(url) ? JSON.parse(body) : parseYaml(body);
+    } catch (e) { console.error(err(`Could not fetch the issuer's declaration at ${url}: ${e.message}`)); process.exit(2); }
+    const v = await verifyDeclaration(decl, { retrievedFrom: url });
+    if (!v.valid || v.location !== 'match' || v.provenanceId !== issuer) {
+      console.error(err(`The issuer's own declaration does not check out (${v.reason ?? 'location or id mismatch'}) — its key cannot be trusted.`));
+      process.exit(1);
+    }
+    key = v.publicKey;
+    console.log(ok(`Issuer ${issuer}: declaration genuine, key ${v.fingerprint.slice(0, 16)}…`));
+  }
+
+  const r = await verifyAttestation(att, { issuerPublicKey: key });
+  const word = { valid: c.green + 'valid', expired: c.amber + 'expired (genuine, but stale)', not_yet_valid: c.amber + 'not yet valid', invalid: c.red + 'INVALID', unchecked: c.amber + 'could not be checked' }[r.status];
+  console.log(`\n${dim('Attestation:')} ${att.id ?? '?'} ${dim('(' + (att.kind ?? '?') + ')')}`);
+  console.log(`${dim('Subject:')}     ${att.subject?.provenance_id ?? att.subject?.url ?? '?'}`);
+  console.log(`${dim('Result:')}      ${word}${c.reset}`);
+  if (r.reason) console.log(dim(r.reason));
+  if (att.scope) console.log(`\n${dim('Scope:')} ${att.scope}`);
+  console.log();
+  if (r.status === 'invalid') process.exit(1);
+  if (r.status === 'unchecked') process.exit(2);
+}
+
 async function cmdRegister(args) {
   const id          = args.id;
   const url         = args.url;
@@ -563,6 +618,7 @@ ${amb('Offline — no service involved:')}
   ${hi('verify')}    <file | url | id>          Verify a declaration's signature and location
                [--from <url>]            where a local file was published
   ${hi('validate')}  [file]                     Check a declaration against the schema
+  ${hi('verify-attestation')} <file | url>     Check a stamp against its issuer's own published key
   ${hi('affiliate')} <declaration>              Vouch, as an organisation, for an agent you operate
                --org <org_provenance_id> [--unit <name>] [--valid-days 365] [--out file]
 
@@ -612,6 +668,7 @@ try {
   else if (cmd === 'sign')     await cmdSign(args);
   else if (cmd === 'verify')   await cmdVerify(args);
   else if (cmd === 'affiliate') await cmdAffiliate(args);
+  else if (cmd === 'verify-attestation') await cmdVerifyAttestation(args);
   else if (cmd === 'register') await cmdRegister(args);
   else if (cmd === 'status')   await cmdStatus(args);
   else if (cmd === 'validate') await cmdValidate(args);

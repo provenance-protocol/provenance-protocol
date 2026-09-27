@@ -214,6 +214,12 @@ npx provenance-protocol verify provenance:domain:agent.example.com
 npx provenance-protocol validate
 ```
 
+Check a stamp someone issued, against the issuer's own published key:
+
+```bash
+npx provenance-protocol verify-attestation stamp.json
+```
+
 `sign` edits the file in place, keeps your comments, and reads the result back
 to confirm it verifies. For a hosted service,
 [`provenance-middleware`](https://github.com/provenance-protocol/provenance-middleware)
