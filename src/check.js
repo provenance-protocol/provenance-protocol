@@ -23,6 +23,7 @@
 
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import YAML from 'yaml';
 import { detectProject } from './init.js';
 
 /** Where a project lists findings it has reviewed and wants left alone. */
@@ -125,4 +126,31 @@ export function applyFindings(declaration, findings) {
   }
   if (d.identity) delete d.identity.signature;
   return d;
+}
+
+/**
+ * Apply findings to the text of a declaration file, keeping its comments and
+ * layout, and removing the now-stale signature. Returns the new text, unsigned:
+ * sign it where the key lives — at start-up by provenance-middleware, or on the
+ * developer's machine with `provenance sign`. Nothing here needs a key.
+ *
+ * @param {string} text        The file's current contents
+ * @param {object[]} findings  Items from checkProject's certain or likely lists
+ * @param {object} [options]
+ * @param {boolean} [options.json]  The file is JSON rather than YAML
+ * @returns {{ text: string, declaration: object }}
+ */
+export function updateDeclarationText(text, findings, { json = false } = {}) {
+  if (json) {
+    const updated = applyFindings(JSON.parse(text), findings);
+    return { text: JSON.stringify(updated, null, 2) + '\n', declaration: updated };
+  }
+  const doc = YAML.parseDocument(text);
+  if (doc.errors.length) throw new Error(doc.errors[0].message);
+  const updated = applyFindings(doc.toJS(), findings);
+  for (const field of new Set(findings.map((f) => f.field.split('.')[0]))) {
+    doc.setIn([field], doc.createNode(updated[field]));
+  }
+  if (doc.hasIn(['identity', 'signature'])) doc.deleteIn(['identity', 'signature']);
+  return { text: doc.toString(), declaration: updated };
 }

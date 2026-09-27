@@ -26,7 +26,7 @@ import { verifyDeclaration, locateDeclaration, keyFingerprint } from './verify.j
 import { validateDeclaration } from './validate.js';
 import { signDeclaration, signAttestation } from './keygen.js';
 import { detectProject, runInit } from './init.js';
-import { checkProject, applyFindings, IGNORE_FILE } from './check.js';
+import { checkProject, updateDeclarationText, IGNORE_FILE } from './check.js';
 import { createInterface } from 'readline/promises';
 
 const VERSION = createRequire(import.meta.url)('../package.json').version;
@@ -260,19 +260,18 @@ async function cmdCheck(args) {
 
   const key = findPrivateKey(args);
   if (!key) { console.error(err('No key to sign with: set PROVENANCE_PRIVATE_KEY, or keep .provenance-key here')); process.exit(2); }
-  const updated = applyFindings(value, accepted);
+  const { text: newText, declaration: updated } = updateDeclarationText(readFileSync(path, 'utf8'), accepted, { json });
   if (updated.identity?.public_key && derivePublicKey(key) !== updated.identity.public_key) {
     console.error(err('This key does not match identity.public_key — nothing was changed.'));
     process.exit(1);
   }
   const signature = signDeclaration(key, updated);
-
   if (json) {
     writeFileSync(path, JSON.stringify({ ...updated, identity: { ...updated.identity, signature } }, null, 2) + '\n');
   } else {
-    for (const field of new Set(accepted.map((f) => f.field.split('.')[0]))) doc.setIn([field], doc.createNode(updated[field]));
-    doc.setIn(['identity', 'signature'], signature);
-    writeFileSync(path, doc.toString());
+    const d2 = YAML.parseDocument(newText);
+    d2.setIn(['identity', 'signature'], signature);
+    writeFileSync(path, d2.toString());
   }
   const back = await verifyDeclaration(readDocument(file).value);
   if (!back.valid) { console.error(err(`Wrote ${file} but it does not verify: ${back.reason}`)); process.exit(1); }

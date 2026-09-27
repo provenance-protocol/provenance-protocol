@@ -35,3 +35,12 @@ export function readIgnore(dir: string): Set<string>;
 export function checkProject(dir: string, declaration: object, options?: { ignore?: Iterable<string> }): CheckResult;
 /** Apply findings; returns an unsigned copy to sign. */
 export function applyFindings(declaration: object, findings: CheckFinding[]): object;
+
+/**
+ * Apply findings to a declaration file's text, keeping comments and layout,
+ * and removing the stale signature. Returns unsigned text — sign it where the
+ * key lives. Needs no key.
+ */
+export function updateDeclarationText(
+  text: string, findings: CheckFinding[], options?: { json?: boolean }
+): { text: string; declaration: object };

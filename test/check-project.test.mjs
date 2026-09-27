@@ -7,7 +7,7 @@ import http from 'node:http';
 import https from 'node:https';
 import { execFileSync } from 'node:child_process';
 import YAML from 'yaml';
-import { checkProject, applyFindings } from '../src/check.js';
+import { checkProject, applyFindings, updateDeclarationText } from '../src/check.js';
 import { runInit } from '../src/init.js';
 import { verifyDeclaration } from '../src/verify.js';
 
@@ -69,6 +69,15 @@ t('--update leaves the promise and says so', decl.constraints.includes('no:write
 let strictFailed = false;
 try { execFileSync('node', [new URL('../src/cli.js', import.meta.url).pathname, 'check', '--strict'], { cwd: dir, encoding: 'utf8', stdio: 'pipe' }); } catch { strictFailed = true; }
 t('--strict fails the build while a promise conflict remains', strictFailed);
+
+// Keyless file update: comments kept, stale signature removed, facts applied.
+{
+  const text = '# my agent\nprovenance: "0.2"\nname: A # the name\ndescription: B\nversion: 1.0.0\nidentity:\n  public_key: K\n  signature: OLD\n';
+  const { text: out, declaration } = updateDeclarationText(text, [{ field: 'version', change: 'modified', value: '2.0.0' }]);
+  t('keyless update keeps comments', out.includes('# my agent') && out.includes('# the name'), out);
+  t('keyless update removes the stale signature', !out.includes('OLD') && !declaration.identity.signature, out);
+  t('keyless update applies the fact', YAML.parse(out).version === '2.0.0');
+}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);
