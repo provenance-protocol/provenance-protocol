@@ -187,6 +187,22 @@ creates a key kept out of git, and signs. Nothing leaves your machine. With
 `--yes` it fills in only what your project shows and makes no promises for you:
 a promise has to be a decision.
 
+## Keep it true as the code changes
+
+```bash
+npx provenance-protocol check            # what changed in the project that the passport doesn't say
+npx provenance-protocol check --update   # apply the facts, confirm the guesses, re-sign
+```
+
+It reads the project on your machine — nothing is sent anywhere, and a test in
+this repository proves it makes no network connection. Facts the project states
+outright (version, the AI provider's library, servers in your MCP settings) are
+applied; inferences ("an email library, so it probably sends email") are asked
+about; code that clashes with a promise is reported and **never** resolved for
+you, because dropping a promise is a public weakening. List a reviewed finding in
+`.provenance-ignore` to leave it alone. In CI, `provenance-action` runs the same
+check on every build.
+
 ## Sign your own declaration
 
 From the command line — no service involved:

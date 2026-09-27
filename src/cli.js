@@ -4,6 +4,7 @@
  *
  * Offline — no service involved:
  *   provenance init [--domain <host>] [--yes]
+ *   provenance check [file] [--update] [--strict]
  *   provenance keygen
  *   provenance sign [file]
  *   provenance verify <file | url | provenance_id> [--from <url>]
@@ -25,6 +26,7 @@ import { verifyDeclaration, locateDeclaration, keyFingerprint } from './verify.j
 import { validateDeclaration } from './validate.js';
 import { signDeclaration, signAttestation } from './keygen.js';
 import { detectProject, runInit } from './init.js';
+import { checkProject, applyFindings, IGNORE_FILE } from './check.js';
 import { createInterface } from 'readline/promises';
 
 const VERSION = createRequire(import.meta.url)('../package.json').version;
@@ -190,6 +192,93 @@ async function cmdInit(args) {
   console.log(`\n${amb('Keep it honest on every build')} ${dim('(.github/workflows/provenance.yml):')}`);
   console.log(dim('  - uses: provenance-protocol/provenance-action@v1'));
   console.log();
+}
+
+// The key used to sign: the environment, or the file init creates.
+function findPrivateKey(args) {
+  if (typeof args['private-key'] === 'string') return args['private-key'];
+  if (process.env.PROVENANCE_PRIVATE_KEY) return process.env.PROVENANCE_PRIVATE_KEY;
+  const f = resolve(process.cwd(), '.provenance-key');
+  return existsSync(f) ? readFileSync(f, 'utf8').trim() : null;
+}
+
+async function cmdCheck(args) {
+  const file = args._[1] || 'PROVENANCE.yml';
+  const { path, json, doc, value } = readDocument(file);
+  const r = checkProject(process.cwd(), value);
+  const show = (f) => {
+    const what = f.field === 'dependencies' ? (f.value.provenance_id ?? f.value.url) : f.value;
+    return `${f.field}: ${f.change === 'modified' ? `${f.from} → ` : '+ '}${what}  ${dim('(' + f.reason + ')')}`;
+  };
+
+  console.log(`\n${amb('Checking')} ${hi(file)} ${dim('against this project — read locally, nothing is sent anywhere')}\n`);
+  for (const c of r.conflicts) {
+    console.log(`${err(`Your code conflicts with a promise: ${c.promise}`)} ${dim('— ' + c.reason)}`);
+    console.log(`  ${dim('Either change the code, or remove the promise yourself and re-sign. Buyers are told when a promise is dropped.')}`);
+  }
+  if (r.inSync) {
+    console.log(ok('Passport matches the project'));
+    if (r.ignored) console.log(dim(`  (${r.ignored} finding(s) ignored via ${IGNORE_FILE})`));
+    console.log();
+    return;
+  }
+
+  if (!args.update) {
+    for (const f of r.certain) console.log(`  ${amb('update:')}  ${show(f)}`);
+    for (const f of r.likely) console.log(`  ${amb('confirm:')} ${show(f)}`);
+    if (r.certain.length || r.likely.length) {
+      console.log(`\n  ${dim('Run')} ${hi('npx provenance-protocol check --update')} ${dim('to apply, or list a finding in ' + IGNORE_FILE + ' to leave it alone.')}`);
+    }
+    console.log();
+    if (args.strict) process.exit(1);
+    return;
+  }
+
+  // --update: certain facts are applied; each likely one is asked about.
+  const accepted = [...r.certain];
+  const ignoreNew = [];
+  if (r.likely.length) {
+    if (!process.stdin.isTTY) {
+      for (const f of r.likely) console.log(`  ${amb('not applied (needs a person):')} ${show(f)}`);
+    } else {
+      const rl = createInterface({ input: process.stdin, output: process.stdout });
+      for (const f of r.likely) {
+        const a = (await rl.question(`  ${show(f)}\n  Add it? [y]es / [n]o / [i]gnore from now on: `)).trim().toLowerCase();
+        if (a === 'y' || a === 'yes') accepted.push(f);
+        else if (a === 'i' || a === 'ignore') ignoreNew.push(f.key);
+      }
+      rl.close();
+    }
+  }
+  if (ignoreNew.length) {
+    const ig = resolve(process.cwd(), IGNORE_FILE);
+    const prev = existsSync(ig) ? readFileSync(ig, 'utf8') : '# Findings from `provenance check` reviewed and left alone\n';
+    writeFileSync(ig, prev + (prev.endsWith('\n') ? '' : '\n') + ignoreNew.join('\n') + '\n');
+    console.log(ok(`${ignoreNew.length} finding(s) added to ${IGNORE_FILE}`));
+  }
+  if (!accepted.length) { console.log(dim('\n  Nothing applied.\n')); if (args.strict && r.conflicts.length) process.exit(1); return; }
+
+  const key = findPrivateKey(args);
+  if (!key) { console.error(err('No key to sign with: set PROVENANCE_PRIVATE_KEY, or keep .provenance-key here')); process.exit(2); }
+  const updated = applyFindings(value, accepted);
+  if (updated.identity?.public_key && derivePublicKey(key) !== updated.identity.public_key) {
+    console.error(err('This key does not match identity.public_key — nothing was changed.'));
+    process.exit(1);
+  }
+  const signature = signDeclaration(key, updated);
+
+  if (json) {
+    writeFileSync(path, JSON.stringify({ ...updated, identity: { ...updated.identity, signature } }, null, 2) + '\n');
+  } else {
+    for (const field of new Set(accepted.map((f) => f.field.split('.')[0]))) doc.setIn([field], doc.createNode(updated[field]));
+    doc.setIn(['identity', 'signature'], signature);
+    writeFileSync(path, doc.toString());
+  }
+  const back = await verifyDeclaration(readDocument(file).value);
+  if (!back.valid) { console.error(err(`Wrote ${file} but it does not verify: ${back.reason}`)); process.exit(1); }
+  for (const f of accepted) console.log(ok(show(f)));
+  console.log(ok(`${file} updated and signed\n`));
+  if (args.strict && r.conflicts.length) process.exit(1);
 }
 
 async function cmdSign(args) {
@@ -469,6 +558,7 @@ ${hi('provenance')} ${dim(`v${VERSION}`)} — Provenance Protocol CLI
 
 ${amb('Offline — no service involved:')}
   ${hi('init')}      [--domain <host>] [--yes]  Write and sign your first declaration (about 5 minutes)
+  ${hi('check')}     [file] [--update] [--strict] Compare the passport with the project; --update applies facts
   ${hi('keygen')}                              Generate an Ed25519 keypair
   ${hi('sign')}      [file]                     Sign a 0.2 declaration in place (default: ./PROVENANCE.yml)
   ${hi('verify')}    <file | url | id>          Verify a declaration's signature and location
@@ -518,6 +608,7 @@ const cmd  = args._[0];
 try {
   if (!cmd || cmd === 'help' || args.help) cmdHelp();
   else if (cmd === 'init')     await cmdInit(args);
+  else if (cmd === 'check')    await cmdCheck(args);
   else if (cmd === 'keygen')   await cmdKeygen();
   else if (cmd === 'sign')     await cmdSign(args);
   else if (cmd === 'verify')   await cmdVerify(args);
