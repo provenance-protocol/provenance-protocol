@@ -139,6 +139,8 @@ export interface CheckDeclarationOptions {
    * Stands in for the location check when the location does not match.
    */
   affiliation?: { attestation: unknown; issuerPublicKey: string; now?: Date | number };
+  /** Spec 0.3: refuse a declaration whose dependencies are not all pinned to an exact version. */
+  requirePinned?: boolean;
 }
 
 export interface CheckDeclarationResult {
@@ -210,6 +212,17 @@ export function verifyNotice(notice: unknown, options: { publicKey: string }): P
  * Whether a declaration's links to an A2A Agent Card and an MCP Registry
  * entry are confirmed by shared control or merely claimed.
  */
+/**
+ * Spec 0.3 / notice 0.2: compare what a build resolved (the notice's
+ * `resolved` claim) with the declaration's pinned dependencies. Offline;
+ * verify the notice first.
+ */
+export function checkPins(declaration: object, notice: object): {
+  dependency: string;
+  result: 'match' | 'mismatch' | 'unpinned' | 'not_reported';
+  differs?: string[];
+}[];
+
 export function checkInteropLinks(declaration: object): {
   a2a: 'confirmed' | 'claimed' | 'none';
   mcp: 'confirmed' | 'claimed' | 'none';

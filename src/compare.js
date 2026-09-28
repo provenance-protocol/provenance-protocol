@@ -115,6 +115,13 @@ function limitDirection(from, to) {
   return 'neutral';
 }
 
+// A dependency losing its pin is looser than before; gaining one is tighter;
+// moving a pin to another version is normal, and reported, but neutral.
+function pinDirection(from, to) {
+  const had = from?.pin && typeof from.pin === 'object', has = to?.pin && typeof to.pin === 'object';
+  return had && !has ? 'weakened' : !had && has ? 'strengthened' : 'neutral';
+}
+
 function subprocessorDirection(from, to) {
   const before = new Set([...(from?.regions ?? []), ...(from?.data_categories ?? [])]);
   const after = [...(to?.regions ?? []), ...(to?.data_categories ?? [])];
@@ -136,6 +143,7 @@ function compareLists(field, a = [], b = [], out) {
         const direction =
           field === 'limits' ? limitDirection(before.get(k), x)
           : field === 'subprocessors' ? subprocessorDirection(before.get(k), x)
+          : field === 'dependencies' ? pinDirection(before.get(k), x)
           : 'neutral';
         out.push({ field, change: 'modified', from: before.get(k), to: x, direction });
       }

@@ -1,6 +1,7 @@
 # Proposal: Pinning dependencies
 
-Status: **draft for discussion** — target spec 0.3, nothing implemented yet
+Status: **adopted** in spec 0.3 and notice format 0.2 — `pin`, change rules, `resolved`, `checkPins` and `requirePinned` are in provenance-protocol 0.14.0. Not yet built: `provenance-action` writing `resolved` from the lockfile, and `provenance check` comparing a lockfile with pins.
+Decisions on the open questions: `integrity` accepts SRI only (a PyPI sha256 hex digest is written in SRI form); unpinned dependencies are reported only on request (`requirePinned`); `resolved` is allowed on `declaration-published` as well as `release`.
 Date: 28 September 2026
 
 ## Problem

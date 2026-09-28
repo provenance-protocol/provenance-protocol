@@ -38,7 +38,7 @@ const ALGORITHM = 'ed25519';
  *   0.2 — signs the canonical form of the whole declaration. Any change to any
  *         field breaks it.
  */
-const SIGNATURE_COVERAGE = { '0.1': 'identity', '0.2': 'declaration' };
+const SIGNATURE_COVERAGE = { '0.1': 'identity', '0.2': 'declaration', '0.3': 'declaration' };
 
 function subtle() {
   const s = globalThis.crypto?.subtle;
@@ -526,6 +526,10 @@ export async function checkDeclaration(declaration, options = {}) {
   for (const c of requireCapabilities) {
     if (!capabilities.includes(c)) return refuse(`Agent does not declare capability: ${c}`);
   }
+  if (options.requirePinned) {
+    const loose = (Array.isArray(declaration?.dependencies) ? declaration.dependencies : []).filter((d) => !isPinned(d));
+    if (loose.length) return refuse(`Dependencies not pinned to an exact version: ${loose.map((d) => d.provenance_id ?? d.url).join(', ')}`);
+  }
 
   return { allowed: true, reason: null, verification, anchor };
 }
@@ -691,7 +695,7 @@ export async function verifyAttestationWithdrawal(issuerPublicKey, issuerId, att
   }
 }
 
-const NOTICE_VERSIONS = new Set(['0.1']);
+const NOTICE_VERSIONS = new Set(['0.1', '0.2']);
 const NOTICE_EVENTS = new Set(['declaration-published', 'release', 'key-rotation', 'incident']);
 
 /**
@@ -860,4 +864,46 @@ export async function openDeliveredDeclaration(notice) {
   const n = await verifyNotice(notice, { publicKey: v.publicKey });
   if (!n.valid) return fail(`Notice ${n.status}: ${n.reason}`);
   return { valid: true, reason: null, declaration };
+}
+
+// ---------------------------------------------------------------- pins (0.3)
+
+const PIN_FIELDS = ['version', 'integrity', 'commit', 'declaration_digest'];
+function isPinned(dep) {
+  return dep && typeof dep.pin === 'object' && dep.pin !== null && PIN_FIELDS.some((f) => typeof dep.pin[f] === 'string');
+}
+const depKey = (d) => d?.provenance_id ?? d?.url;
+
+/**
+ * Compare what a build actually resolved (the `resolved` claim of a verified
+ * release or declaration-published notice, format 0.2) with the declaration's
+ * pins. Offline; verify the notice first with verifyNotice.
+ *
+ * For each dependency: 'match' when every pinned field equals what was
+ * resolved; 'mismatch' when any pinned field differs — the pin was declared
+ * and something else shipped; 'unpinned' when something shipped that the
+ * declaration names but does not pin, or does not name at all; 'not_reported'
+ * when a pinned dependency is missing from what was resolved.
+ *
+ * @param {object} declaration
+ * @param {object} notice
+ * @returns {{ dependency: string, result: 'match'|'mismatch'|'unpinned'|'not_reported', differs?: string[] }[]}
+ */
+export function checkPins(declaration, notice) {
+  const deps = Array.isArray(declaration?.dependencies) ? declaration.dependencies : [];
+  const resolved = Array.isArray(notice?.claims?.resolved) ? notice.claims.resolved : [];
+  const byKey = new Map(resolved.filter((r) => depKey(r)).map((r) => [depKey(r), r]));
+  const out = [];
+  for (const d of deps) {
+    const key = depKey(d);
+    if (!key) continue;
+    const r = byKey.get(key);
+    byKey.delete(key);
+    if (!isPinned(d)) { if (r) out.push({ dependency: key, result: 'unpinned' }); continue; }
+    if (!r) { out.push({ dependency: key, result: 'not_reported' }); continue; }
+    const differs = PIN_FIELDS.filter((f) => typeof d.pin[f] === 'string' && r[f] !== d.pin[f]);
+    out.push(differs.length ? { dependency: key, result: 'mismatch', differs } : { dependency: key, result: 'match' });
+  }
+  for (const key of byKey.keys()) out.push({ dependency: key, result: 'unpinned' });
+  return out;
 }

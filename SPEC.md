@@ -260,6 +260,30 @@ dependencies:
     kind: api
 ```
 
+*Spec 0.3.* A dependency may carry a **`pin`**: the exact version the operator
+intends to run, signed with the rest of the declaration. It has at least one
+of `version` (exact, as the registry names it — never a range), `integrity`
+(a Subresource-Integrity hash: `sha256-`, `sha384-` or `sha512-` and base64),
+`commit` (a full git commit id) and `declaration_digest` (for a dependency with
+its own declaration: the digest of the declaration relied on).
+
+```yaml
+provenance: "0.3"
+dependencies:
+  - url: "https://www.npmjs.com/package/postmark-mcp"
+    kind: mcp_server
+    pin: { version: "1.0.15", integrity: "sha512-3u4…" }
+  - provenance_id: "provenance:domain:search-tool.example"
+    kind: agent
+    pin: { declaration_digest: "sha256:9f2c…" }
+```
+
+A pin says what should run; a `release` notice's `resolved` claim says what
+did ([Notices](#notices)). `checkPins` compares the two: **match**,
+**mismatch** (a pin was declared and something else shipped), **unpinned** or
+**not reported**. A pin does not make a dependency safe; it makes the choice
+explicit, signed and comparable, so a silent change is visible.
+
 **`certifications`** — pointers only. A certification is proven by the
 certifier's signed [attestation](#attestations), which `attestation_url`
 points to; the declaration naming it proves nothing on its own.
@@ -792,9 +816,15 @@ is `schema/notice-0.1.json`.
 | Event | Claims | Sent when |
 |---|---|---|
 | `declaration-published` | `declaration_url`, `declaration_digest`, `running_version`, and optionally the full `declaration` | the service starts, or the declaration changes |
-| `release` | `version`, `commit`, `declaration_digest` | CI ships a release — ties promises to a build |
+| `release` | `version`, `commit`, `declaration_digest`, and from format 0.2 optionally `resolved` | CI ships a release — ties promises to a build |
 | `key-rotation` | `new_public_key`, `reason` | the operator replaces its key |
 | `incident` | `severity`, `summary`, `started_at`, `resolved_at`, `relates_to` | the operator discloses its own incident |
+
+**Notice format 0.2** (`"notice": "0.2"`) is 0.1 plus an optional `resolved`
+claim on `release` and `declaration-published`: what the build actually
+resolved, one entry per dependency, each naming it by `provenance_id` or `url`
+with any of `version`, `integrity`, `commit` or `declaration_digest`. Signed by
+the agent's key like every notice, it is what pins are checked against.
 
 **Key rotation is signed by the old key.** The notice is the old key vouching
 for the new one. A verifier that pinned the old key accepts the new key as a
@@ -876,12 +906,13 @@ Each change is classified for someone relying on the agent:
 | retention lengthened; `training_use` moving towards `yes` | retention shortened; `training_use` moving towards `none` |
 | a capability no longer needing human approval; no longer pausable by the customer | a capability newly needing approval |
 | a limit raised or removed | a limit lowered or added |
-| a dependency added | |
+| a dependency added; a dependency's `pin` removed | a dependency's `pin` added |
 | a certification removed | |
 | the notice period shortened or removed | a notice period lengthened or added |
 | `identity.public_key` or `provenance_id` changed | |
 
-Everything else is neutral. A weakening is **announced** when the previous
+Everything else is neutral — including a `pin` moved to another version, which
+is reported so a watcher can judge the new target. A weakening is **announced** when the previous
 version listed it in `changes.pending`. A weakening that took effect without
 having been pending for the declared `notice_period` breaks the operator's own
 promise, which a watcher with the history can show.
@@ -1000,6 +1031,12 @@ the one the declaration asks for.
 
 Where a version changes the meaning of an existing field, it will always do so
 by declaring a new version, never by reinterpreting an old one.
+
+Version 0.3 only adds: the `pin` on a dependency. It signs exactly as 0.2. It is
+a new version rather than a quiet addition because 0.2's schema refuses fields
+it does not know, so a 0.2 validator would reject a pinned declaration; the
+`provenance` field tells a reader which rules to apply. Notices likewise gain
+format 0.2 for the `resolved` claim.
 
 ---
 

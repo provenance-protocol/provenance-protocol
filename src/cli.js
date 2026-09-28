@@ -287,8 +287,8 @@ async function cmdSign(args) {
   if (!privateKey) { console.error(err('PROVENANCE_PRIVATE_KEY (or --private-key) is required to sign')); process.exit(2); }
 
   const { path, json, doc, value } = readDocument(file);
-  if (value?.provenance !== '0.2') {
-    console.error(err(`Only spec 0.2 declarations are signed here (this one says ${JSON.stringify(value?.provenance ?? null)}).`));
+  if (value?.provenance !== '0.2' && value?.provenance !== '0.3') {
+    console.error(err(`Only spec 0.2 and 0.3 declarations are signed here (this one says ${JSON.stringify(value?.provenance ?? null)}).`));
     console.error(dim('0.1 signatures do not cover capabilities or constraints. Set provenance: "0.2" and run again.'));
     process.exit(1);
   }

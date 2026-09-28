@@ -153,6 +153,25 @@ entry. A link is *confirmed* only when the same party provably controls both
 ends; otherwise it is *claimed*, so nobody can attach their declaration to a
 well-known agent.
 
+## Pinned dependencies (spec 0.3)
+
+A declaration can pin what it relies on to an exact version, and a release can
+report what it actually resolved — so a dependency that changes silently, or a
+pin that was never honoured, is visible:
+
+```yaml
+provenance: "0.3"
+dependencies:
+  - url: https://www.npmjs.com/package/postmark-mcp
+    kind: mcp_server
+    pin: { version: 1.0.15, integrity: sha512-3u4… }
+```
+
+```js
+import { checkPins } from 'provenance-protocol';
+checkPins(declaration, releaseNotice);   // [{ dependency, result: 'match' | 'mismatch' | 'unpinned' | 'not_reported' }]
+```
+
 ## Internal agents
 
 A company's own agents, on hosts nobody outside can reach, deliver their

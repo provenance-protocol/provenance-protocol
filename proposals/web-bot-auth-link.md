@@ -1,6 +1,6 @@
 # Proposal: Linking a declaration to Web Bot Auth
 
-Status: **draft for discussion** — target spec 0.3, nothing implemented yet
+Status: **draft for discussion — held** until Web Bot Auth is final at the IETF; its directory location and key format may still change, and a field in this standard cannot be taken back once published.
 Date: 28 September 2026
 
 ## Problem

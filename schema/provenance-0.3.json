@@ -1,0 +1,602 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://getprovenance.dev/schema/0.3.json",
+  "title": "PROVENANCE.yml",
+  "description": "Provenance Protocol v0.2 schema for AI agent identity files",
+  "type": "object",
+  "required": [
+    "provenance",
+    "name",
+    "description"
+  ],
+  "properties": {
+    "provenance": {
+      "type": "string",
+      "description": "Spec version. 0.3 adds pinned dependencies; like 0.2 it signs the whole declaration.",
+      "enum": [
+        "0.3"
+      ]
+    },
+    "name": {
+      "type": "string",
+      "description": "Human-readable name for this agent",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "description": {
+      "type": "string",
+      "description": "What this agent does, in plain language",
+      "minLength": 1,
+      "maxLength": 1000
+    },
+    "version": {
+      "type": "string",
+      "description": "Semantic version of the agent",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+.*$"
+    },
+    "model": {
+      "type": "object",
+      "description": "The LLM powering this agent",
+      "properties": {
+        "provider": {
+          "type": "string",
+          "enum": [
+            "anthropic",
+            "openai",
+            "google",
+            "mistral",
+            "meta",
+            "local",
+            "other"
+          ],
+          "description": "LLM provider"
+        },
+        "model_id": {
+          "type": "string",
+          "description": "Specific model ID e.g. claude-sonnet-4-5"
+        }
+      },
+      "additionalProperties": false
+    },
+    "capabilities": {
+      "type": "array",
+      "description": "What this agent can do \u2014 standard vocabulary or domain:custom",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_-]*(:[a-z0-9_:-]+)?$"
+      },
+      "uniqueItems": true
+    },
+    "constraints": {
+      "type": "array",
+      "description": "Public commitments \u2014 what this agent will NEVER do",
+      "items": {
+        "type": "string",
+        "pattern": "^no:[a-z0-9_:-]+$"
+      },
+      "uniqueItems": true
+    },
+    "delegates": {
+      "type": "array",
+      "description": "Sub-agents this orchestrator spawns \u2014 required if delegate:agents capability declared",
+      "items": {
+        "type": "object",
+        "required": [
+          "provenance_id"
+        ],
+        "properties": {
+          "provenance_id": {
+            "type": "string",
+            "pattern": "^provenance:(github|npm|pypi|huggingface|clawmarket|domain):.+$"
+          },
+          "purpose": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "skills": {
+      "type": "array",
+      "description": "External skills this agent depends on",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "source"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "skillsmp",
+              "github",
+              "npm",
+              "custom"
+            ]
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "description": "How this agent runs",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "task",
+            "persistent",
+            "scheduled"
+          ],
+          "description": "task: runs to completion | persistent: always on | scheduled: cron-like"
+        },
+        "trigger": {
+          "type": "string",
+          "enum": [
+            "api",
+            "webhook",
+            "schedule",
+            "event"
+          ],
+          "description": "What starts this agent"
+        }
+      },
+      "additionalProperties": false
+    },
+    "contact": {
+      "type": "object",
+      "description": "Who is responsible for this agent",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "email": {
+          "type": "string",
+          "format": "email"
+        }
+      },
+      "additionalProperties": false
+    },
+    "provenance_id": {
+      "type": "string",
+      "description": "Stable identifier naming where this declaration is published \u2014 see Provenance IDs in SPEC.md",
+      "pattern": "^provenance:(github|npm|pypi|huggingface|clawmarket|domain):.+$"
+    },
+    "identity": {
+      "type": "object",
+      "description": "Cryptographic identity. public_key alone advertises the key an agent will use to prove control live. Adding signature makes the entire declaration tamper-evident.",
+      "properties": {
+        "public_key": {
+          "type": "string",
+          "description": "Base64-encoded Ed25519 SPKI DER public key. Generate with: generateProvenanceKeyPair() from provenance-protocol/keygen"
+        },
+        "signature": {
+          "type": "string",
+          "description": "Base64 Ed25519 signature over 'provenance-declaration-v1:' followed by the canonical JSON of this parsed declaration with identity.signature removed. Covers every field, so editing capabilities or deleting a constraint breaks it. Generate with signDeclaration() from provenance-protocol/keygen. Optional: omit when the key is published only for live challenge-response."
+        },
+        "algorithm": {
+          "type": "string",
+          "enum": [
+            "ed25519"
+          ],
+          "description": "Signing algorithm. Always ed25519."
+        }
+      },
+      "required": [
+        "public_key"
+      ],
+      "additionalProperties": false
+    },
+    "ajp": {
+      "type": "object",
+      "description": "Agent Job Protocol endpoint \u2014 enables agent-to-agent job delegation",
+      "properties": {
+        "endpoint": {
+          "type": "string",
+          "format": "uri",
+          "description": "Base URL for your AJP implementation. Must accept POST /jobs, GET /jobs/:id, POST /jobs/:id/ack"
+        },
+        "version": {
+          "type": "string",
+          "enum": [
+            "0.1"
+          ],
+          "description": "AJP spec version"
+        }
+      },
+      "required": [
+        "endpoint"
+      ],
+      "additionalProperties": false
+    },
+    "operator": {
+      "type": "object",
+      "description": "The legal party answerable for this agent.",
+      "required": [
+        "legal_name",
+        "jurisdiction"
+      ],
+      "properties": {
+        "legal_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "jurisdiction": {
+          "type": "string",
+          "pattern": "^[A-Z]{2}$",
+          "description": "ISO 3166-1 alpha-2 country whose law the operator is registered under"
+        },
+        "registration": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9-]+:[A-Za-z0-9.-]+$",
+          "description": "scheme:number, e.g. GB-COH:12345678 or LEI:5493001KJTIIGC8Y1R12"
+        },
+        "security_contact": {
+          "type": "string",
+          "format": "uri",
+          "description": "Where to report a security issue \u2014 a security.txt, page or mailto: URI"
+        }
+      },
+      "additionalProperties": false
+    },
+    "data": {
+      "type": "object",
+      "description": "What happens to data the agent is given.",
+      "properties": {
+        "categories": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "customer_content",
+              "personal",
+              "special_category",
+              "financial",
+              "credentials"
+            ]
+          },
+          "uniqueItems": true,
+          "description": "Kinds of data the agent processes"
+        },
+        "retention": {
+          "type": "string",
+          "pattern": "^(none|P(?!$)(\\d+Y)?(\\d+M)?(\\d+W)?(\\d+D)?(T(?=\\d)(\\d+H)?(\\d+M)?(\\d+S)?)?)$",
+          "description": "How long data is kept: ISO 8601 duration, or none"
+        },
+        "training_use": {
+          "type": "string",
+          "enum": [
+            "none",
+            "opt_in",
+            "opt_out",
+            "yes"
+          ],
+          "description": "Whether data is used to train models"
+        },
+        "regions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^([A-Z]{2}|EEA)$",
+            "description": "ISO 3166-1 alpha-2 country code, or EU / EEA"
+          },
+          "uniqueItems": true,
+          "description": "Where data is processed and stored"
+        }
+      },
+      "additionalProperties": false
+    },
+    "subprocessors": {
+      "type": "array",
+      "description": "Other parties that touch the data.",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "role"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "model_provider",
+              "hosting",
+              "storage",
+              "tool",
+              "other"
+            ]
+          },
+          "regions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^([A-Z]{2}|EEA)$",
+              "description": "ISO 3166-1 alpha-2 country code, or EU / EEA"
+            },
+            "uniqueItems": true
+          },
+          "data_categories": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "customer_content",
+                "personal",
+                "special_category",
+                "financial",
+                "credentials"
+              ]
+            },
+            "uniqueItems": true
+          },
+          "provenance_id": {
+            "type": "string",
+            "pattern": "^provenance:(github|npm|pypi|huggingface|clawmarket|domain):.+$"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "oversight": {
+      "type": "object",
+      "description": "What needs a human.",
+      "properties": {
+        "approval_required": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-]*(:[a-z0-9_:-]+)?$"
+          },
+          "uniqueItems": true,
+          "description": "Capabilities exercised only after a human approves each use"
+        },
+        "pausable_by_customer": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "limits": {
+      "type": "array",
+      "description": "Hard ceilings on a capability.",
+      "items": {
+        "type": "object",
+        "required": [
+          "applies_to",
+          "max",
+          "unit"
+        ],
+        "properties": {
+          "applies_to": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-]*(:[a-z0-9_:-]+)?$"
+          },
+          "max": {
+            "type": "number",
+            "minimum": 0
+          },
+          "unit": {
+            "type": "string",
+            "pattern": "^([A-Z]{3}|actions)$",
+            "description": "ISO 4217 currency code, or actions"
+          },
+          "per": {
+            "type": "string",
+            "pattern": "^P(?!$)(\\d+Y)?(\\d+M)?(\\d+W)?(\\d+D)?(T(?=\\d)(\\d+H)?(\\d+M)?(\\d+S)?)?$",
+            "description": "ISO 8601 duration; omit for a per-action limit"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "dependencies": {
+      "type": "array",
+      "description": "What the agent relies on. Supersedes skills and delegates, which remain valid.",
+      "items": {
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "provenance_id": {
+            "type": "string",
+            "pattern": "^provenance:(github|npm|pypi|huggingface|clawmarket|domain):.+$"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "mcp_server",
+              "agent",
+              "api",
+              "package"
+            ]
+          },
+          "purpose": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "pin": {
+            "type": "object",
+            "description": "The exact version the operator intends to run. Signed with the declaration, so it cannot change unseen.",
+            "properties": {
+              "version": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100,
+                "description": "Exact version as the registry names it \u2014 not a range"
+              },
+              "integrity": {
+                "type": "string",
+                "pattern": "^sha(256|384|512)-[A-Za-z0-9+/]+={0,2}$",
+                "description": "Subresource-Integrity hash of the artifact"
+              },
+              "commit": {
+                "type": "string",
+                "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$",
+                "description": "Full git commit id"
+              },
+              "declaration_digest": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$",
+                "description": "For a dependency with a provenance_id: the digest of the declaration relied on"
+              }
+            },
+            "additionalProperties": false,
+            "anyOf": [
+              {
+                "required": [
+                  "version"
+                ]
+              },
+              {
+                "required": [
+                  "integrity"
+                ]
+              },
+              {
+                "required": [
+                  "commit"
+                ]
+              },
+              {
+                "required": [
+                  "declaration_digest"
+                ]
+              }
+            ]
+          }
+        },
+        "anyOf": [
+          {
+            "required": [
+              "provenance_id"
+            ]
+          },
+          {
+            "required": [
+              "url"
+            ]
+          }
+        ],
+        "additionalProperties": false
+      }
+    },
+    "certifications": {
+      "type": "array",
+      "description": "Pointers to certifications. The proof is the certifier's attestation, not this entry.",
+      "items": {
+        "type": "object",
+        "required": [
+          "standard"
+        ],
+        "properties": {
+          "standard": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "attestation_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "The certifier's signed attestation \u2014 preferred"
+          },
+          "report_url": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "changes": {
+      "type": "object",
+      "description": "Advance notice of material changes.",
+      "properties": {
+        "notice_period": {
+          "type": "string",
+          "pattern": "^P(?!$)(\\d+Y)?(\\d+M)?(\\d+W)?(\\d+D)?(T(?=\\d)(\\d+H)?(\\d+M)?(\\d+S)?)?$",
+          "description": "Minimum notice before a weakening change takes effect"
+        },
+        "pending": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "field",
+              "change",
+              "effective"
+            ],
+            "properties": {
+              "field": {
+                "type": "string",
+                "minLength": 1
+              },
+              "change": {
+                "type": "string",
+                "enum": [
+                  "added",
+                  "removed",
+                  "modified"
+                ]
+              },
+              "value": {},
+              "effective": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                "description": "Date the change takes effect"
+              },
+              "reason": {
+                "type": "string",
+                "maxLength": 500
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "interop": {
+      "type": "object",
+      "description": "The same agent in other ecosystems.",
+      "properties": {
+        "a2a_agent_card": {
+          "type": "string",
+          "format": "uri"
+        },
+        "mcp_registry": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Server name in the MCP Registry, e.g. com.example/server"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": true
+}

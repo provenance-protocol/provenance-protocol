@@ -1,0 +1,327 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://getprovenance.dev/schema/notice-0.2.json",
+  "title": "Provenance notice",
+  "description": "A signed statement by an agent's operator about the agent itself \u2014 a declaration published, a release shipped, a key rotated, an incident disclosed. See SPEC.md, Notices.",
+  "type": "object",
+  "required": [
+    "notice",
+    "id",
+    "event",
+    "provenance_id",
+    "key_fingerprint",
+    "issued_at",
+    "claims",
+    "signature"
+  ],
+  "properties": {
+    "notice": {
+      "type": "string",
+      "enum": [
+        "0.2"
+      ],
+      "description": "Notice format version."
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "description": "Unique among this agent's notices."
+    },
+    "event": {
+      "type": "string",
+      "enum": [
+        "declaration-published",
+        "release",
+        "key-rotation",
+        "incident"
+      ]
+    },
+    "provenance_id": {
+      "type": "string",
+      "pattern": "^provenance:(github|npm|pypi|huggingface|clawmarket|domain):.+$"
+    },
+    "key_fingerprint": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "SHA-256 of the signing key. For key-rotation, the OLD key."
+    },
+    "issued_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "claims": {
+      "type": "object"
+    },
+    "signature": {
+      "type": "string",
+      "description": "Base64 Ed25519 over 'provenance-notice-v1:' + the canonical JSON of the notice without signature."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "declaration-published"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "claims": {
+            "type": "object",
+            "required": [
+              "declaration_url",
+              "declaration_digest"
+            ],
+            "properties": {
+              "declaration_url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "declaration_digest": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              "running_version": {
+                "type": "string",
+                "maxLength": 100
+              },
+              "declaration": {
+                "type": "object",
+                "description": "The full signed declaration, for agents whose declaration cannot be fetched by the watcher \u2014 internal or private services. Its digest must equal declaration_digest."
+              },
+              "resolved": {
+                "type": "array",
+                "description": "What the build actually resolved, for comparison with the declaration's pins",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "provenance_id": {
+                      "type": "string",
+                      "pattern": "^provenance:(github|npm|pypi|huggingface|clawmarket|domain):.+$"
+                    },
+                    "url": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "version": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    },
+                    "integrity": {
+                      "type": "string",
+                      "pattern": "^sha(256|384|512)-[A-Za-z0-9+/]+={0,2}$"
+                    },
+                    "commit": {
+                      "type": "string",
+                      "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$"
+                    },
+                    "declaration_digest": {
+                      "type": "string",
+                      "pattern": "^sha256:[0-9a-f]{64}$"
+                    }
+                  },
+                  "anyOf": [
+                    {
+                      "required": [
+                        "provenance_id"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "url"
+                      ]
+                    }
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "release"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "claims": {
+            "type": "object",
+            "required": [
+              "version",
+              "declaration_digest"
+            ],
+            "properties": {
+              "version": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "commit": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{7,64}$"
+              },
+              "declaration_digest": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              "repository": {
+                "type": "string",
+                "format": "uri"
+              },
+              "resolved": {
+                "type": "array",
+                "description": "What the build actually resolved, for comparison with the declaration's pins",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "provenance_id": {
+                      "type": "string",
+                      "pattern": "^provenance:(github|npm|pypi|huggingface|clawmarket|domain):.+$"
+                    },
+                    "url": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "version": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    },
+                    "integrity": {
+                      "type": "string",
+                      "pattern": "^sha(256|384|512)-[A-Za-z0-9+/]+={0,2}$"
+                    },
+                    "commit": {
+                      "type": "string",
+                      "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$"
+                    },
+                    "declaration_digest": {
+                      "type": "string",
+                      "pattern": "^sha256:[0-9a-f]{64}$"
+                    }
+                  },
+                  "anyOf": [
+                    {
+                      "required": [
+                        "provenance_id"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "url"
+                      ]
+                    }
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "key-rotation"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "claims": {
+            "type": "object",
+            "required": [
+              "new_public_key"
+            ],
+            "properties": {
+              "new_public_key": {
+                "type": "string"
+              },
+              "new_key_fingerprint": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "reason": {
+                "type": "string",
+                "enum": [
+                  "routine",
+                  "compromise",
+                  "other"
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "incident"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "claims": {
+            "type": "object",
+            "required": [
+              "severity",
+              "summary",
+              "started_at"
+            ],
+            "properties": {
+              "severity": {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "critical"
+                ]
+              },
+              "summary": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2000
+              },
+              "started_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "resolved_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "relates_to": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Declared constraints or capabilities concerned"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    }
+  ],
+  "additionalProperties": false
+}
