@@ -172,6 +172,18 @@ import { checkPins } from 'provenance-protocol';
 checkPins(declaration, releaseNotice);   // [{ dependency, result: 'match' | 'mismatch' | 'unpinned' | 'not_reported' }]
 ```
 
+## Every passport a site publishes
+
+A site with several agents can list them at one fixed address, so anyone who
+knows only the website can find them all with a single request:
+
+```js
+import { locateIndex, readIndex } from 'provenance-protocol';
+const url = locateIndex('example.com');          // https://example.com/.well-known/provenance/index.json
+const { agents } = readIndex(await (await fetch(url)).json(), { fetchedFrom: url });
+// Each entry is a pointer: verify every declaration at its own location.
+```
+
 ## Internal agents
 
 A company's own agents, on hosts nobody outside can reach, deliver their

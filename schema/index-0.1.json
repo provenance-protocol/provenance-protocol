@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://getprovenance.dev/schema/index-0.1.json",
+  "title": "Provenance site index",
+  "description": "The declarations a site says it publishes, served at https://<host>/.well-known/provenance/index.json. A pointer for discovery, never proof: every listed declaration is verified at its own location.",
+  "type": "object",
+  "required": ["provenance_index", "site", "agents"],
+  "properties": {
+    "provenance_index": { "type": "string", "enum": ["0.1"], "description": "Index format version." },
+    "site": { "type": "string", "pattern": "^[a-z0-9.-]+(:[0-9]+)?$", "description": "The host serving the index; must equal the host it was fetched from." },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "operator": { "type": "string", "pattern": "^provenance:(github|npm|pypi|huggingface|clawmarket|domain):.+$", "description": "The site operator's own provenance id." },
+    "agents": {
+      "type": "array",
+      "description": "At most 1,000 entries; a reader ignores the rest.",
+      "items": {
+        "type": "object",
+        "required": ["provenance_id"],
+        "properties": {
+          "provenance_id": { "type": "string", "pattern": "^provenance:(github|npm|pypi|huggingface|clawmarket|domain):.+$" },
+          "name": { "type": "string", "minLength": 1, "maxLength": 200, "description": "A display hint only." }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

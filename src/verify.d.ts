@@ -223,6 +223,19 @@ export function checkPins(declaration: object, notice: object): {
   differs?: string[];
 }[];
 
+/** Spec: site index 0.1 — where a host lists the declarations it publishes. */
+export function locateIndex(host: string): string | null;
+
+/**
+ * Read a site index: a pointer for discovery, never proof. Each entry must be
+ * verified at its own location; `onSite` is false for an entry elsewhere,
+ * which is only what the site claims it publishes.
+ */
+export function readIndex(index: unknown, options: { fetchedFrom: string }): {
+  valid: boolean; reason: string | null; site: string | null; operator: string | null;
+  agents: { provenanceId: string; name: string | null; onSite: boolean }[];
+};
+
 export function checkInteropLinks(declaration: object): {
   a2a: 'confirmed' | 'claimed' | 'none';
   mcp: 'confirmed' | 'claimed' | 'none';

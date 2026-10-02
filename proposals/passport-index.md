@@ -1,6 +1,6 @@
 # Proposal: A site index of passports
 
-Status: **draft for discussion** — target: a new document type (index 0.1), alongside spec 0.3; nothing implemented yet
+Status: **adopted** — index format 0.1 is in SPEC.md ("Finding every passport a site publishes"); `locateIndex`, `readIndex` and `validateIndex` are in provenance-protocol 0.15.0, and provenance-middleware 0.6.0 can serve an index. Open questions left for later: signing the index, and digests per entry.
 Date: 1 October 2026
 
 ## Problem

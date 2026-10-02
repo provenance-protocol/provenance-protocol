@@ -907,3 +907,56 @@ export function checkPins(declaration, notice) {
   for (const key of byKey.keys()) out.push({ dependency: key, result: 'unpinned' });
   return out;
 }
+
+// ---------------------------------------------------------- site index (0.1)
+
+const INDEX_MAX = 1000;
+const ID_PATTERN = /^provenance:(github|npm|pypi|huggingface|clawmarket|domain):.+$/;
+
+/**
+ * Where a site's index of declarations lives: one fixed address per host, so a
+ * watcher that knows only a website can discover every passport it publishes
+ * without fetching any other page.
+ *
+ * @param {string} host  e.g. "example.com"
+ * @returns {string|null}
+ */
+export function locateIndex(host) {
+  if (typeof host !== 'string' || !/^[a-z0-9.-]+(:\d+)?$/i.test(host.trim())) return null;
+  return `https://${host.trim().toLowerCase()}/.well-known/provenance/index.json`;
+}
+
+/**
+ * Read a site index. A pointer, never proof: every entry must still be
+ * verified at its own location, and an entry off this site is only what the
+ * site claims it publishes. Refuses an index whose `site` is not the host it
+ * was fetched from.
+ *
+ * @param {object} index           parsed index.json
+ * @param {object} options
+ * @param {string} options.fetchedFrom  URL the index was fetched from
+ * @returns {{ valid: boolean, reason: string|null, site: string|null, operator: string|null,
+ *             agents: { provenanceId: string, name: string|null, onSite: boolean }[] }}
+ */
+export function readIndex(index, { fetchedFrom } = {}) {
+  const bad = (reason) => ({ valid: false, reason, site: null, operator: null, agents: [] });
+  if (index === null || typeof index !== 'object' || Array.isArray(index)) return bad('Index must be an object');
+  if (index.provenance_index !== '0.1') return bad(`Index version ${JSON.stringify(index.provenance_index ?? null)} is not known to this reader`);
+  let host;
+  try { host = new URL(fetchedFrom).host.toLowerCase(); } catch { return bad('fetchedFrom must be the URL the index came from'); }
+  if (typeof index.site !== 'string' || index.site.toLowerCase() !== host) {
+    return bad(`Index names site ${JSON.stringify(index.site ?? null)} but was fetched from ${host}`);
+  }
+  if (!Array.isArray(index.agents)) return bad('Index has no agents list');
+  const seen = new Set();
+  const agents = [];
+  for (const entry of index.agents.slice(0, INDEX_MAX)) {
+    const id = entry?.provenance_id;
+    if (typeof id !== 'string' || !ID_PATTERN.test(id) || seen.has(id)) continue;
+    seen.add(id);
+    const parsed = parseProvenanceId(id);
+    const onSite = parsed?.platform === 'domain' && parsed.path.split('/')[0].toLowerCase() === host;
+    agents.push({ provenanceId: id, name: typeof entry.name === 'string' ? entry.name.slice(0, 200) : null, onSite });
+  }
+  return { valid: true, reason: null, site: host, operator: typeof index.operator === 'string' ? index.operator : null, agents };
+}

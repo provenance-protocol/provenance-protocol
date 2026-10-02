@@ -448,6 +448,36 @@ so the same signature verifies either form. It MUST be served over HTTPS, and a
 verifier SHOULD NOT follow a redirect to another host: the location check is
 what ties the document to its operator.
 
+### Finding every passport a site publishes
+
+A host can hold only one declaration at `/.well-known/provenance.json`. A site
+that publishes more — agents under paths, or in its repositories — MAY list them
+in a **site index** at:
+
+```
+https://<host>/.well-known/provenance/index.json
+```
+
+```json
+{
+  "provenance_index": "0.1",
+  "site": "example.com",
+  "operator": "provenance:domain:example.com",
+  "agents": [
+    { "provenance_id": "provenance:domain:example.com/agents/support", "name": "Support Agent" },
+    { "provenance_id": "provenance:github:example/research-agent" }
+  ]
+}
+```
+
+`site` MUST equal the host the index was fetched from; at most 1,000 entries
+are read; `name` is a display hint only. The index is a pointer, never proof:
+every listed declaration is verified at its own location exactly as if it had
+been found any other way, and an entry off the site is only what the site
+claims to publish. A watcher that knows only a host fetches at most these two
+files — the declaration and the index — and no other page. Schema:
+`schema/index-0.1.json`; reference functions `locateIndex` and `readIndex`.
+
 The agent MAY also expose a live challenge endpoint at
 `https://<host>/.well-known/provenance/challenge` (see
 [Live proof of key control](#live-proof-of-key-control)).

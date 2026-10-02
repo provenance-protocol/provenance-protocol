@@ -1,6 +1,6 @@
 # Registering this standard's well-known URIs with IANA
 
-Status: **ready to send** — not yet submitted
+Status: **not pursued for now** — kept for when registering is worth the effort; the names are in use regardless.
 Date: 1 October 2026
 
 ## Why

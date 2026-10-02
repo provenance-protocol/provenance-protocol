@@ -17,3 +17,6 @@ export function validateAttestation(attestation: unknown): ValidationResult;
 
 /** Validate a parsed notice against the schema for its `notice` version. */
 export function validateNotice(notice: unknown): ValidationResult;
+
+/** Validate a parsed site index (format 0.1). */
+export function validateIndex(index: unknown): ValidationResult;
