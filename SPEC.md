@@ -448,6 +448,16 @@ so the same signature verifies either form. It MUST be served over HTTPS, and a
 verifier SHOULD NOT follow a redirect to another host: the location check is
 what ties the document to its operator.
 
+The location check is structural. For a domain id, the URL's host must equal
+the id's host exactly, on the standard port, and the URL's path must **begin**
+with the id's path. For a platform id, the owner and name must sit exactly
+where that platform puts them — `github.com/<owner>/<repo>/…`,
+`raw.githubusercontent.com/<owner>/<repo>/…`, `api.github.com/repos/<owner>/<repo>/…`,
+`huggingface.co[/spaces|datasets|models]/<owner>/<repo>/…`,
+`npmjs.com/package/<name>`, `registry.npmjs.org/<name>`, `pypi.org/project/<name>/…`.
+A repository that merely contains folders with the right names is someone
+else's repository, and does not match.
+
 ### Finding every passport a site publishes
 
 A host can hold only one declaration at `/.well-known/provenance.json`. A site
@@ -931,6 +941,7 @@ Each change is classified for someone relying on the agent:
 | Weakened | Strengthened |
 |---|---|
 | a constraint removed | a constraint added |
+| a stated `retention`, a `training_use` other than `yes`, or every `region` withdrawn (the promise becomes unknown) | a `retention` or a `training_use` other than `yes` stated where none was |
 | a capability added | a capability removed |
 | a data category, region or subprocessor added; a subprocessor gaining a region or data category | a certification added |
 | retention lengthened; `training_use` moving towards `yes` | retention shortened; `training_use` moving towards `none` |

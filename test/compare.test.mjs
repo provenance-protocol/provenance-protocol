@@ -83,6 +83,18 @@ t('key changed → weakened until a rotation notice explains it', find(compareDe
 after = clone(base); after.description = 'C';
 t('description edit → neutral', find(compareDeclarations(base, after), 'description', 'modified')?.direction === 'neutral');
 
+// A promise withdrawn entirely leaves nothing promised: a weakening (audit, 3 October 2026).
+after = clone(base); after.data = { ...after.data }; delete after.data.retention;
+t('finite retention promise withdrawn → weakened', find(compareDeclarations(base, after), 'data.retention', 'removed')?.direction === 'weakened');
+const optIn = clone(base); optIn.data = { ...optIn.data, training_use: 'opt_in' };
+after = clone(optIn); delete after.data.training_use;
+t('opt-in-only training promise withdrawn → weakened', find(compareDeclarations(optIn, after), 'data.training_use', 'removed')?.direction === 'weakened');
+const withRegions = clone(base); withRegions.data = { ...withRegions.data, regions: ['EU'] };
+after = clone(withRegions); after.data.regions = [];
+t('every region withdrawn → weakened', find(compareDeclarations(withRegions, after), 'data.regions', 'removed')?.direction === 'weakened');
+after = clone(withRegions); after.data.regions = ['EU', 'US']; const twoRegions = clone(after); after.data.regions = ['EU'];
+t('one of several regions dropped → still neutral', find(compareDeclarations(twoRegions, after), 'data.regions', 'removed')?.direction === 'neutral');
+
 t('durations: P1Y > P30D > P1W', durationDays('P1Y') > durationDays('P30D') && durationDays('P30D') > durationDays('P1W'));
 t('durations: malformed → null', durationDays('30 days') === null && durationDays('P') === null);
 

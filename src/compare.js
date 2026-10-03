@@ -154,7 +154,9 @@ function compareLists(field, a = [], b = [], out) {
   const before = a.map((x) => JSON.stringify(canon(x)));
   const after = b.map((x) => JSON.stringify(canon(x)));
   a.forEach((x, i) => {
-    if (!after.includes(before[i])) out.push({ field, change: 'removed', value: x, direction: listDirection(field, 'removed') });
+    // Every region withdrawn at once leaves where data goes unstated: a weakening, not a narrowing.
+    const withdrawn = field === 'data.regions' && after.length === 0;
+    if (!after.includes(before[i])) out.push({ field, change: 'removed', value: x, direction: withdrawn ? 'weakened' : listDirection(field, 'removed') });
   });
   b.forEach((x, i) => {
     if (!before.includes(after[i])) out.push({ field, change: 'added', value: x, direction: listDirection(field, 'added') });
@@ -186,19 +188,22 @@ function walk(path, a, b, out) {
   }
 }
 
-// A commitment that disappears entirely is a weakening; one that appears is a
-// strengthening. Everything else added or removed as a whole is neutral.
+// A commitment that disappears entirely is a weakening — what was promised is
+// now unknown — and one that appears is a strengthening. Everything else added
+// or removed as a whole is neutral.
 function removedScalarDirection(path, value) {
   if (path === 'changes.notice_period' || (path === 'oversight.pausable_by_customer' && value === true)) return 'weakened';
-  if (path === 'data.training_use' && value === 'none') return 'weakened';
-  if (path === 'data.retention' && value === 'none') return 'weakened';
+  // Any stated limit on training or retention, withdrawn, leaves the customer with no promise at all.
+  if (path === 'data.training_use' && value !== 'yes') return 'weakened';
+  if (path === 'data.retention') return 'weakened';
   if (path === 'identity.public_key' || path === 'provenance_id') return 'weakened';
   return 'neutral';
 }
 
 function addedScalarDirection(path, value) {
   if (path === 'changes.notice_period' || (path === 'oversight.pausable_by_customer' && value === true)) return 'strengthened';
-  if (path === 'data.training_use' && value === 'none') return 'strengthened';
+  if (path === 'data.training_use' && value !== 'yes') return 'strengthened';
+  if (path === 'data.retention') return 'strengthened';
   return 'neutral';
 }
 
