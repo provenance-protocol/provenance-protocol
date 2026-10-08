@@ -1,5 +1,5 @@
 # Provenance Protocol Specification
-**Declarations 0.1 and 0.2 · Attestations 0.1 · Notices 0.1**
+**Declarations 0.1, 0.2 and 0.3 · Attestations 0.1 · Notices 0.1 and 0.2**
 
 ---
 
@@ -154,7 +154,7 @@ identity:
 
 | Field | Type | Description |
 |---|---|---|
-| `provenance` | string | Spec version: `"0.2"` for new declarations, `"0.1"` legacy |
+| `provenance` | string | Spec version: `"0.2"` for new declarations, `"0.3"` when a dependency carries a `pin`, `"0.1"` legacy |
 | `name` | string | Human-readable name for this agent |
 | `description` | string | What this agent does, in plain language |
 
@@ -1003,7 +1003,8 @@ the history accumulated about that URL carries over.
 An implementation of this specification is conformant if it:
 
 1. Accepts every file that validates against the schema for its declared
-   version — `schema/provenance-0.1.json` or `schema/provenance-0.2.json`.
+   version — `schema/provenance-0.1.json`, `schema/provenance-0.2.json` or
+   `schema/provenance-0.3.json`.
 2. Treats `provenance`, `name` and `description` as required and everything
    else as optional.
 3. Ignores unrecognised top-level fields rather than rejecting the file.

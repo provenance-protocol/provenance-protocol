@@ -65,7 +65,7 @@ const result = await verifyDeclaration(declaration, { retrievedFrom: url });
 result.valid        // the signature verifies against the key in the file
 result.coverage     // 'declaration' (0.2) | 'identity' (0.1)
 result.location     // 'match' | 'mismatch' | 'unchecked'
-result.trustworthy  // valid AND served from the location it claims
+result.trustworthy  // valid AND served from the location it claims: about the file, not the agent's conduct
 result.fingerprint  // SHA-256 of the key — pin it to detect rotation
 ```
 
