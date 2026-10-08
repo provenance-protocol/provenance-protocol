@@ -308,7 +308,7 @@ changes:
       reason: "adding CRM sync"
 ```
 
-**`interop`** — the same agent in other ecosystems. See
+**`interop`** — this agent's listings in other ecosystems, as its publisher states them. See
 [Linking with A2A and MCP](#linking-with-a2a-and-mcp).
 
 ```yaml
@@ -736,7 +736,7 @@ verifier's choice, the same way each border decides which stamps it honours.
 | `attestation` | yes | Format version. A verifier MUST refuse to guess at one it does not know. |
 | `id` | yes | Unique among this issuer's attestations. |
 | `kind` | yes | `declaration-check`, `report`, `decision`, or a custom kind prefixed with the issuer's domain (`example.com:pen-test`). |
-| `issuer.provenance_id` | yes | The issuer is an agent like any other: its own declaration publishes its public key. |
+| `issuer.provenance_id` | yes | The issuer's own Provenance declaration, which publishes its public key. An issuer is often an organisation or a service, such as an assessor or a monitoring service, not necessarily an AI agent; its declaration states who it is. |
 | `issuer.key_fingerprint` | yes | SHA-256 of the issuer's public key (SPKI DER), hex. Names which key signed, so a rotation is visible. |
 | `subject.provenance_id` / `subject.url` | one of | The agent the attestation is about. `url` is for an agent observed without a declaration. |
 | `subject.declaration_digest` | per kind | Which state of the subject's declaration it is about: `sha256:` + hex SHA-256 of the declaration's 0.2 signing payload. Unchanged by formatting or signature; changed by any field. |
@@ -991,6 +991,16 @@ A link is **confirmed** when both ends are controlled by the same party:
 A watcher MUST report a claimed link as claimed. Treating a link as confirmed
 without matching control would let anyone attach their declaration to a
 well-known agent.
+
+**What confirmed establishes.** Confirmed means the two identifiers are under
+the same party's control: the same host, registry namespace or GitHub account.
+The reference implementation (`checkInteropLinks`) computes it from the
+identifiers alone and does not fetch the listing. It does not establish that
+the listing describes the same software, release or deployment: one party may
+publish several agents and servers under one namespace. A consumer MUST NOT
+merge the histories, approvals or evidence of two subjects on the strength of a
+confirmed link alone, and SHOULD describe it as matching control (for example,
+"the publisher name matches"), not as the same agent.
 
 An agent that has only an A2A card or an MCP entry can still be the subject of
 an attestation, named by `subject.url`. When it later publishes a declaration,
