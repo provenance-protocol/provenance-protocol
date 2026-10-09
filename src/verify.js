@@ -789,7 +789,9 @@ export async function verifyNotice(notice, options = {}) {
  * are confirmed by shared control, or merely claimed. Offline; see SPEC.md,
  * "Linking with A2A and MCP".
  *
- *   confirmed  the same party provably controls both ends
+ *   confirmed  the identifiers share control (host, registry namespace or GitHub account),
+ *              computed from the identifiers alone; the listing is not fetched, and it may
+ *              describe other software from the same party. Never merge subjects on this alone.
  *   claimed    the declaration names it, but control is not shown to match
  *   none       no link declared
  *
