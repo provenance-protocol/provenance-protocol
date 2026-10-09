@@ -148,10 +148,12 @@ import { checkInteropLinks } from 'provenance-protocol';
 checkInteropLinks(declaration);   // { a2a: 'confirmed' | 'claimed' | 'none', mcp: … }
 ```
 
-A declaration can point to the same agent's A2A Agent Card and MCP Registry
-entry. A link is *confirmed* only when the same party provably controls both
-ends; otherwise it is *claimed*, so nobody can attach their declaration to a
-well-known agent.
+A declaration can point to its agent's A2A Agent Card and MCP Registry entry.
+A link is *confirmed* when the identifiers share control (the same host,
+registry namespace or GitHub account); otherwise it is *claimed*, so nobody can
+attach their declaration to a well-known agent. Confirmed is computed from the
+identifiers without fetching the listing, and does not make two listings the
+same software: don't merge their histories or approvals on it alone.
 
 ## Pinned dependencies (spec 0.3)
 
