@@ -332,7 +332,7 @@ async function cmdVerify(args) {
   let value, retrievedFrom = typeof args.from === 'string' ? args.from : undefined;
 
   if (/^provenance:/.test(target) || /^https?:\/\//.test(target)) {
-    const url = /^provenance:/.test(target) ? locateDeclaration(target) : target;
+    const url = /^provenance:/.test(target) ? locateDeclaration(target) : siteDeclaration(target) ?? target;
     if (!url) {
       console.error(err(`No standard location for ${target}. Pass the declaration's URL instead.`));
       process.exit(2);
@@ -345,6 +345,12 @@ async function cmdVerify(args) {
     } catch (e) {
       console.error(err(`Could not fetch ${url}: ${e.message}`));
       console.error(dim('Nothing was verified. This is not a verification failure.'));
+      process.exit(2);
+    }
+    if (url !== target && !/^provenance:/.test(target)) console.log(dim(`${target} is a site, so its declaration was read from its standard location: ${url}`));
+    if (/^\s*</.test(text)) {
+      console.error(err(`${url} returned a web page, not a declaration.`));
+      console.error(dim('Nothing was verified. Pass the declaration\'s own URL, or its provenance id (provenance:domain:<host>).'));
       process.exit(2);
     }
     try { value = /\.json($|\?)/i.test(url) ? JSON.parse(text) : parseYaml(text); }
@@ -391,6 +397,14 @@ async function cmdVerify(args) {
   if (!r.valid) process.exit(1);
   if (vouched) process.exit(vouched.error ? 1 : 0);
   if (r.location === 'mismatch') process.exit(1);
+}
+
+/** A bare site address (nothing after the host) stands for the site's own declaration at its standard location. */
+function siteDeclaration(target) {
+  let u;
+  try { u = new URL(target); } catch { return null; }
+  if ((u.pathname !== '/' && u.pathname !== '') || u.search || u.hash) return null;
+  return `${u.protocol}//${u.host}/.well-known/provenance.json`;
 }
 
 /** An organisation's or issuer's key, from its own declaration, verified at its own location. */
@@ -698,6 +712,7 @@ ${amb('Examples:')}
   provenance init
   provenance sign
   provenance verify provenance:domain:agent.example.com
+  provenance verify https://agent.example.com
   provenance validate
 `);
 }

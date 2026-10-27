@@ -253,6 +253,7 @@ From the command line — no service involved:
 npx provenance-protocol keygen            # once; keep the private key in your env
 PROVENANCE_PRIVATE_KEY=… npx provenance-protocol sign PROVENANCE.yml
 npx provenance-protocol verify provenance:domain:agent.example.com
+npx provenance-protocol verify https://agent.example.com   # same check: a bare site address means its standard location
 npx provenance-protocol validate
 ```
 
