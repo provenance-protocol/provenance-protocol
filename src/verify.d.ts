@@ -186,6 +186,26 @@ export function verifyAttestation(
   options: { issuerPublicKey: string; now?: Date | number }
 ): Promise<AttestationVerification>;
 
+export interface DecisionBasis {
+  /** 'current': made against the current declaration; 'superseded': against an earlier one; 'unknown': no digest, or no current declaration. */
+  basis: 'current' | 'superseded' | 'unknown';
+  reason: string | null;
+  /** What changed since, when the basis declaration was supplied; otherwise null. */
+  changes: import('./index.js').DeclarationChange[] | null;
+  /** Fields that weakened since, when the basis declaration was supplied; otherwise null. */
+  weakened: string[] | null;
+}
+
+/**
+ * Whether the declaration an attestation (normally a `decision`) is pinned to is
+ * still the current one. Reported apart from the attestation's status, which it
+ * never changes; it does not check the signature. Pass a current declaration
+ * already verified with whole-declaration coverage (0.2 or later).
+ */
+export function checkDecisionBasis(
+  attestation: unknown, currentDeclaration?: object | null, basisDeclaration?: object
+): Promise<DecisionBasis>;
+
 /** Verify an issuer's withdrawal of one of its attestations. */
 export function verifyAttestationWithdrawal(
   issuerPublicKey: string, issuerId: string, attestationId: string, signatureBase64: string

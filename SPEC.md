@@ -777,6 +777,23 @@ approval: `outcome` (`approved` / `withdrawn`), `use`, `decided_at`,
 to the exact declared state it was made against — and a later change to the
 declaration is visibly a change to the basis of the decision.
 
+A verifier that holds the subject's current declaration SHOULD report the
+decision's **basis** apart from its status:
+
+| Basis | Meaning |
+|---|---|
+| `current` | `subject.declaration_digest` equals the digest of the current declaration |
+| `superseded` | it differs: the decision was made against an earlier state |
+| `unknown` | no current declaration was available, or the attestation names no digest |
+
+The basis never changes the attestation's status: a decision made against an
+earlier declaration can still read `valid`, and a forgery still reads
+`invalid`. A verifier that also holds the declaration the digest names SHOULD
+list the changes from it to the current one, using
+[Comparing declarations](#comparing-declarations), and say whether any of them
+weakened. A declaration that does not have the named digest is not the basis,
+and MUST NOT be compared as if it were.
+
 ### Validity and expiry
 
 Every attestation expires. Absence of news cannot be carried in a document, so

@@ -16,6 +16,7 @@
  * Uses the Web Crypto API (crypto.subtle): all modern browsers, Node 18+.
  */
 
+import { compareDeclarations } from './compare.js';
 import {
   declarationSigningPayload,
   challengePayload,
@@ -442,6 +443,49 @@ export function locateDeclaration(provenanceId) {
 export async function declarationDigest(declaration) {
   const bytes = new TextEncoder().encode(declarationSigningPayload(declaration));
   return `sha256:${toHex(new Uint8Array(await subtle().digest('SHA-256', bytes)))}`;
+}
+
+/**
+ * Whether the declaration a decision (or any attestation pinned to a
+ * `subject.declaration_digest`) was made against is still the current one.
+ *
+ * `current`: the digest matches the current declaration. `superseded`: it does
+ * not, so the decision was made against an earlier state. `unknown`: no current
+ * declaration was supplied, or the attestation names no digest. The basis is
+ * reported apart from the attestation's status and never changes it; this does
+ * not check the signature, which is verifyAttestation's job.
+ *
+ * Precondition: the caller has verified the current declaration with
+ * whole-declaration coverage (a 0.2 or later signature). A 0.1 signature covers
+ * the identity only, so a matching digest would rest on unsigned contents.
+ *
+ * Given the declaration the digest names as well, it lists what changed since,
+ * by "Comparing declarations", and which fields weakened. A basis declaration
+ * that does not match the digest is refused, never compared.
+ *
+ * @param {object} attestation
+ * @param {object|null} [currentDeclaration]  The subject's current declaration, already verified by the caller
+ * @param {object} [basisDeclaration]  The declaration the digest names, if held
+ * @returns {Promise<{ basis: 'current'|'superseded'|'unknown', reason: string|null, changes: object[]|null, weakened: string[]|null }>}
+ */
+export async function checkDecisionBasis(attestation, currentDeclaration, basisDeclaration) {
+  const digest = attestation?.subject?.declaration_digest;
+  const unknown = (reason) => ({ basis: 'unknown', reason, changes: null, weakened: null });
+  if (typeof digest !== 'string') return unknown('the attestation names no declaration digest');
+  if (!currentDeclaration || typeof currentDeclaration !== 'object') return unknown('no current declaration was available');
+  const subjectId = attestation.subject.provenance_id;
+  if (subjectId && currentDeclaration.provenance_id && currentDeclaration.provenance_id !== subjectId) {
+    throw new Error(`the current declaration is for ${currentDeclaration.provenance_id}, not the attestation's subject ${subjectId}`);
+  }
+  if (await declarationDigest(currentDeclaration) === digest) return { basis: 'current', reason: null, changes: [], weakened: [] };
+  if (!basisDeclaration) return { basis: 'superseded', reason: 'the declaration has changed since', changes: null, weakened: null };
+  if (await declarationDigest(basisDeclaration) !== digest) throw new Error('the basis declaration is not the one the attestation names');
+  // A digest names a document, not an agent: an earlier state of the subject must be the subject's own (audit PP-BASIS-01).
+  const basisId = basisDeclaration.provenance_id, currentId = subjectId ?? currentDeclaration.provenance_id;
+  if (basisId && currentId && basisId !== currentId) throw new Error(`the basis declaration is for ${basisId}, not the attestation's subject ${currentId}`);
+  const changes = compareDeclarations(basisDeclaration, currentDeclaration);
+  return { basis: 'superseded', reason: 'the declaration has changed since', changes,
+    weakened: [...new Set(changes.filter((c) => c.direction === 'weakened').map((c) => c.field))] };
 }
 
 /**

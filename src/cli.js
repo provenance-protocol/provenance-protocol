@@ -23,7 +23,7 @@ import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
 import { createRequire } from 'module';
 import YAML from 'yaml';
-import { verifyDeclaration, checkDeclaration, locateDeclaration, keyFingerprint, verifyAttestation } from './verify.js';
+import { verifyDeclaration, checkDeclaration, locateDeclaration, keyFingerprint, verifyAttestation, checkDecisionBasis } from './verify.js';
 import { validateDeclaration } from './validate.js';
 import { signDeclaration, signAttestation } from './keygen.js';
 import { detectProject, runInit } from './init.js';
@@ -528,10 +528,70 @@ async function cmdVerifyAttestation(args) {
   console.log(`${dim('Subject:')}     ${att.subject?.provenance_id ?? att.subject?.url ?? '?'}`);
   console.log(`${dim('Result:')}      ${word}${c.reset}`);
   if (r.reason) console.log(dim(r.reason));
+  // A decision is pinned to one state of the subject's declaration: say whether that is still the current one.
+  // The basis is reported apart from the result and never changes it.
+  if (att.kind === 'decision' && r.status !== 'invalid') {
+    const basis = await decisionBasis(att);
+    const line = { current: c.green + 'current — made against the declaration published now',
+      superseded: c.amber + 'superseded — the declaration has changed since this decision was made',
+      unknown: c.amber + `unknown — ${basis.reason}` }[basis.basis];
+    console.log(`${dim('Basis:')}       ${line}${c.reset}`);
+  }
   if (att.scope) console.log(`\n${dim('Scope:')} ${att.scope}`);
   console.log();
   if (r.status === 'invalid') process.exit(1);
   if (r.status === 'unchecked') process.exit(2);
+}
+
+// The subject's current declaration, fetched and verified at its own address, compared with the decision's digest.
+// The lookup is extra to the result already printed, so it is bounded in time and size: a host that stalls or sends
+// too much gives "unknown", never a command that does not finish. PROVENANCE_BASIS_TIMEOUT_MS overrides the time (tests).
+const BASIS_TIMEOUT_MS = Number(process.env.PROVENANCE_BASIS_TIMEOUT_MS) || 10_000;
+const BASIS_MAX_BYTES = 1_048_576;
+
+async function boundedText(url) {
+  const ctl = new AbortController();
+  let reader = null, timer;
+  const read = (async () => {
+    const res = await fetch(url, { redirect: 'error', signal: ctl.signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.body) return '';
+    reader = res.body.getReader();
+    const chunks = []; let size = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > BASIS_MAX_BYTES) throw new Error(`larger than ${BASIS_MAX_BYTES} bytes`);
+      chunks.push(value);
+    }
+    return new TextDecoder().decode(Buffer.concat(chunks));
+  })();
+  const deadline = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`no complete answer within ${BASIS_TIMEOUT_MS / 1000} s`)), BASIS_TIMEOUT_MS); });
+  try { return await Promise.race([read, deadline]); }
+  finally {
+    clearTimeout(timer);
+    // Whatever is still open is closed, so nothing keeps the command running.
+    ctl.abort();
+    reader?.cancel().catch(() => {});
+    read.catch(() => {});
+  }
+}
+
+async function decisionBasis(att) {
+  const id = att.subject?.provenance_id;
+  const url = id ? locateDeclaration(id) : null;
+  if (!url) return { basis: 'unknown', reason: 'the subject\'s declaration cannot be located' };
+  let decl;
+  try {
+    const body = await boundedText(url);
+    decl = /\.json($|\?)/.test(url) ? JSON.parse(body) : parseYaml(body);
+  } catch (e) { return { basis: 'unknown', reason: `the subject's current declaration could not be fetched (${e.message})` }; }
+  const v = await verifyDeclaration(decl, { retrievedFrom: url });
+  if (!v.valid || v.location !== 'match' || v.provenanceId !== id) return { basis: 'unknown', reason: 'the subject\'s current declaration does not check out' };
+  // A 0.1 signature covers the identity only, so the contents the digest compares are not authenticated (audit PP-BASIS-03).
+  if (v.coverage !== 'declaration') return { basis: 'unknown', reason: 'the subject\'s current declaration is signed for its identity only (spec 0.1), so its contents are not covered by the signature' };
+  try { return await checkDecisionBasis(att, decl); } catch (e) { return { basis: 'unknown', reason: e.message }; }
 }
 
 async function cmdRegister(args) {

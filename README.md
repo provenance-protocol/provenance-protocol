@@ -126,6 +126,29 @@ subprocessor or region added, human approval dropped, a limit raised. A
 weakening the operator listed in advance under `changes.pending` is marked
 `announced`.
 
+### Is an approval still about the current declaration?
+
+A `decision` attestation is pinned to the declaration it was made against.
+When the agent's declaration changes, the decision can still read `valid`;
+its basis is what says so:
+
+```js
+import { checkDecisionBasis } from 'provenance-protocol';
+
+const b = await checkDecisionBasis(decision, currentDeclaration, basisDeclaration /* optional */);
+b.basis     // 'current' | 'superseded' | 'unknown'
+b.weakened  // e.g. ['data.retention'], when the basis declaration was supplied
+```
+
+Pass a current declaration you have already verified with whole-declaration
+coverage (a 0.2 or later signature): `checkDecisionBasis` compares contents and
+does not check signatures, and a 0.1 signature covers the identity only. A
+basis declaration with another digest, or for another agent, is refused.
+
+`provenance verify-attestation` prints the basis of a decision, fetched and
+verified at the subject's own address within 10 seconds; anything it cannot
+establish reads `unknown` with the reason. It never changes the result.
+
 ## Notices — the operator's own signed updates
 
 ```js
